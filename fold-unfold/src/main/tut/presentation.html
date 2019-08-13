@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Folds and Unfolds</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+      body { font-family: 'Droid Serif'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+    </style>
+  </head>
+  <!--
+       Abstract
+
+       With a fold, you can describe how to transforming a data structure with multiple elements into a single one. An example would be the sum of numbers in an array. However, working with the more well-known versions of fold, foldRight/reduceRight/etc. is complicated because you usually have two running variables at a time. This workshop explains patterns to make writing folds easier.
+
+       Unfolds are the opposite, in math speak the dual, of folds. They construct a data structure from a single element. This pattern is a bit less-known, as it occurs a bit less frequently than folds. A prime example would be to abstract over pagination from an external source, and transform the input into a continuous data structure.
+
+  -->
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+## Folds and Unfolds
+
+<img src="https://i.ytimg.com/vi/kUsxMXwCW8A/maxresdefault.jpg" alt="Folded" style="width: 100%;"/>
+
+---
+
+# The Meta
+### Format
+
+???
+
+Enough laptops?
+
+Workshop, with increasing length, mark when you're done.
+
+---
+
+# The Meta
+## Tools
+
+- slate
+
+`https://github.com/reactormonk/workshops`
+
+and then
+
+`fold-unfold/slate`
+
+---
+
+
+# Why folds?
+
+```tut:book
+def foo(arg: Map[String, Int]) = {
+  var result: Int = 0
+  arg.foreach({case (k, v) =>
+    result += v
+  })
+  result
+}
+```
+
+???
+
+---
+
+# folds!
+
+```tut:book
+def foo(arg: Map[String, Int]) = {
+  arg.map(_._2).sum
+}
+```
+
+???
+
+Yeah, I know about values.
+
+---
+
+# Fold
+
+```haskell
+data Fold i o = forall m . Monoid m => Fold (i -> m) (m -> o)
+```
+
+```
+trait Fold[I, O] {
+  type M
+  def tally(i: I): M
+  def summarize(m: M): O
+  def monoid: Monoid[M]
+}
+```
+
+???
+
+Beautiful folds
+
+---
+
+# Fold
+
+```tut:book
+import cats._
+object f1 {
+  trait Fold[I, O] {
+    type M
+    def tally(i: I): M
+    def summarize(m: M): O
+    def monoid: Monoid[M]
+  }
+
+  object Fold {
+    def runList[I, O](fold: Fold[I, O], data: List[I]): O = {
+      ???
+    }
+  }
+}
+```
+
+???
+
+---
+
+# Fold
+
+```
+I0 =tally> M0 \
+               combine => M01
+I1 =tally> M1 /              \
+                              combine => M0123 => summarize => O0123
+I2 =tally> M2 \              /
+               combine => M23
+I3 =tally> M3 /
+```
+
+---
+
+# Fold
+
+```tut:book
+import cats.implicits._
+trait Fold[I, O] {
+  type M
+  def tally(i: I): M
+  def summarize(m: M): O
+  def monoid: Monoid[M]
+}
+
+object Fold {
+  def runList[I, O](fold: Fold[I, O], data: List[I]) = {
+    fold.summarize(
+      data.map(i => fold.tally(i))
+        .foldRight(fold.monoid.empty)((x, y) => fold.monoid.combine(x, y)) // or combineAll
+    )
+  }
+}
+```
+
+???
+
+Could branch off into beautiful folds...
+
+---
+
+# Write more code!
+
+- sum: `List[Int] => Option[Int]`
+- max: `List[Int] => Option[Int]`
+- average: `List[Int] => Option[Int]`
+- word count: `List[String] => Map[String, Int]`
+
+???
+
+object sumfold {
+  val sum = new Fold[Int, Int] {
+    type M = ?
+    def tally(i: Int): M = ???
+    def summarize(sum: M): Int = ???
+    def monoid = new Monoid[M] {
+      def empty = ???
+      def combine(a: M, b: M): M = ???
+    }
+  }
+}
+
+
+object wordcount {
+  val wc = new Fold[String, Map[String, Int]] {
+    type M = ?
+    def tally(s: String): M = ???
+    def summarize(sum: M): Int = ???
+    def monoid = new Monoid[M] {
+      def empty = ???
+      def combine(a: M, b: M): M = ???
+    }
+  }
+}
+
+---
+
+# Sum
+
+```tut:book
+object sumfold {
+  val sum = new Fold[Int, Int] {
+    type M = Int
+    def tally(i: M): M = i
+    def summarize(sum: M): M = sum
+    def monoid = implicitly
+  }
+}
+Fold.runList(sumfold.sum, List(1, 2, 3, 4))
+```
+
+---
+
+# WordCount
+
+```tut:book
+object wordcount {
+  val sum = new Fold[String, Map[String, Int]] {
+    type M = Map[String, Int]
+    def tally(s: String): M = Map(s -> 1)
+    def summarize(sum: M): M = sum
+    def monoid: Monoid[M] = implicitly
+  }
+}
+```
+
+---
+
+# folds!
+
+```tut:book
+def foo(arg: Map[String, Int]) = {
+  arg.map(_._2).sum
+}
+```
+
+is short for
+
+```tut:book
+def foo(arg: Map[String, Int]) = {
+  arg.map(_._2).foldLeft(0)(_ + _)
+}
+```
+
+---
+
+# folds!
+
+```tut:book
+def foo(arg: Map[String, Int]) = {
+  arg.toList.map(_._2).combineAll
+}
+```
+
+or even shorter
+
+```tut:book
+def foo(arg: Map[String, Int]) = {
+  arg.toList.foldMap(_._2)
+}
+```
+
+---
+
+# To remember
+
+- `foldMap`
+- Monoids exist for lotsa things
+
+---
+
+# Break
+
+---
+
+# Unfolds
+
+- Pagination
+- more!
+
+---
+
+# Iterate
+
+```tut:book
+Iterator.iterate(0)(_ + 1).take(10).toList
+```
+
+---
+
+# Unfold
+
+```haskell
+unfoldr :: (a -> Maybe (b, a)) -> a -> [b]
+```
+
+Implement:
+
+```scala
+def unfold[A, B](initial: A)(fun: A => Option[(A, B)]): Stream[B] = ???
+def unfold0[A](initial: A)(fun: A => Option[A]): Stream[A] = ???
+def unfoldE[A, B](initial: A)(fun: A => Stream[Either[A, B]]): Stream[B] = ???
+```
+
+Hint: `#::` is Stream add
+
+???
+
+Arguments in scala reversed becuase of type inference.
+https://github.com/tpolecat/examples/blob/master/src/main/scala/eg/Unfold.scala
+
+---
+
+# Unfold
+## Implementation
+
+```tut:book
+def unfold[A, B](initial: A)(fun: A => Option[(A, B)]): Stream[B] =
+  fun(initial).map { case (a, b) => b #:: unfold(a)(fun) }.getOrElse(Stream.empty)
+def unfold0[A](a: A)(fun: A => Option[A]): Stream[A] =
+  unfold(a)({state => fun(state).map({newState => (newState, newState)})})
+
+def unfoldE[A, B](initial: A)(fun: A => Stream[Either[A, B]]): Stream[B] =
+  fun(initial).flatMap {
+    case Left(a) => unfoldE(a)(fun)
+    case Right(b) => Stream(b)
+  }
+```
+
+---
+
+## Leap Years
+`def leapYears(from: Int): Stream[Int]`
+
+divisible by 4 / not divisble by 100 / divisible by 400
+
+## Hailstone
+`def hailstone(from: Int): Stream[Int]`
+
+if even, n/2, if odd, n * 3 + 1, abort on 1
+
+## Fibonacci
+`val fibonacci: Stream[Int]`
+
+n(i+2) = n(i+1) + n(i)
+
+???
+
+---
+
+# Leap Years
+
+```tut:book
+def leapYears(from: Int): Stream[Int] =
+  unfold0(from)(x => Some(x + 1)).filter({ year =>
+    (year % 4 == 0) && (! (year % 100 == 0) || (year % 400 == 0))
+  })
+
+leapYears(1990).take(8).toList
+```
+
+---
+
+# Hailstone
+
+```tut:book
+def hailstone(from: Int): Stream[Int] = unfold0(from)({
+  case 1 => None
+  case x if x % 2 == 0 => Some(x/2)
+  case x => Some(x*3 + 1)
+})
+
+hailstone(12).toList
+```
+
+---
+
+# Fibonacci
+
+```tut:book
+val fibonacci: Stream[Int] = unfold((1, 1))({
+  case (prev, current) =>
+    Some(((current, prev + current), prev))
+})
+
+fibonacci.take(10).toList
+```
+
+---
+
+# Pagination
+
+- effectful: Now with `Observable` from Monix (or ZIO `Stream`)
+- ZIO `Stream` != stdlib `Stream`
+
+???
+
+What does effectful mean? Effect control.
+
+---
+
+# Pagination
+
+Find the unfold on the `Observable` companion object (it's not called unfold)
+
+https://monix.io/api/3.0/monix/reactive/Observable$.html
+
+<!-- And find the unfold on ZIO `Stream`s -->
+
+<!-- https://javadoc.io/doc/dev.zio/zio-streams_2.12/1.0.0-RC11-1 -->
+
+???
+
+tailRecM
+
+---
+
+# Pagination
+
+Implement it! Result should be `Observable[Post]` <!-- (or `Stream[Post]`) -->
+
+## Resources
+
+- json-server
+- slate
+
+---
+
+# Bonus round
+
+![](https://github.com/slamdata/matryoshka/raw/master/resources/matryoshka.png)
+
+
+</textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js">
+    </script>
+    <script>
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
