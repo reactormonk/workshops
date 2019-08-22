@@ -23,6 +23,7 @@
        Unfolds are the opposite, in math speak the dual, of folds. They construct a data structure from a single element. This pattern is a bit less-known, as it occurs a bit less frequently than folds. A prime example would be to abstract over pagination from an external source, and transform the input into a continuous data structure.
 
   -->
+
   <body>
     <textarea id="source">
 
@@ -35,7 +36,15 @@ class: center, middle
 ---
 
 # The Meta
-### Format
+### ToC
+
+- Folds
+  - Excursion: Monoids
+  - Fold
+
+- Unfolds
+  - Primitives
+  - Pagination
 
 ???
 
@@ -55,6 +64,17 @@ Workshop, with increasing length, mark when you're done.
 and then
 
 `fold-unfold/slate`
+
+Intellij / metals & sbt
+
+---
+
+# Folds
+## Other Names
+
+- reduce (Javascript, Ruby)
+- collect (Java)
+- inject (Ruby)
 
 ---
 
@@ -95,12 +115,18 @@ Yeah, I know about values.
 data Fold i o = forall m . Monoid m => Fold (i -> m) (m -> o)
 ```
 
-```
+```tut:book
+import cats._
 trait Fold[I, O] {
   type M
   def tally(i: I): M
   def summarize(m: M): O
   def monoid: Monoid[M]
+}
+
+trait Monoid[A] {
+  def combine(a: A, b: A): A
+  def empty: A
 }
 ```
 
@@ -112,8 +138,101 @@ Beautiful folds
 
 # Fold
 
+```
+I0 =tally> M0 \
+               combine => M01
+I1 =tally> M1 /              \
+                              combine => M0123 => summarize => O0123
+I2 =tally> M2 \              /
+               combine => M23
+I3 =tally> M3 /
+```
+
+---
+
+# Intermission: Typeclasses & Monoids
+
+---
+
+# A bit of Context
+- class: state + dictionary of functions
+- typeclass: dictionary of functions, associated by type
+
+???
+
+See python for dictionaries.
+
+---
+
+# Examples
+## Stdlib
+
+- Ordering
+- Numeric
+- CanBuildFrom
+
+## JSON
+
+- spray: JsonWriter/JsonReader
+- circe: Encoder/Decoder
+
+---
+
+# Combiner (Monoid)
+## Implementation
+
 ```tut:book
-import cats._
+trait Monoid[A] {
+  def append(a: A, b: A): A
+  def zero: A
+}
+```
+
+???
+
+How do you define the types for `OOSemigroup`?
+[Not possible!](https://tpolecat.github.io/2015/04/29/f-bounds.html)
+
+---
+
+# Monoid
+## Laws
+
+- associativity: (a + b) + c == a + (b + c)
+- left identity: id + a == a
+- right identity: a + id == a
+
+---
+
+# Exercises
+
+## Monoid: Simple
+
+- String
+- List[A]
+
+---
+
+# Execises
+## Monoid: Nested
+
+- Tuple2[A, B]
+- Map[A, B]
+
+```scala
+implicit def monoidTuple2[A](implicit monoidA: Monoid[A]) = { monoidA.combine(...) }
+implicit def monoidTuple2[A: Monoid] = { ... |+| ... }
+```
+
+---
+
+# Intermission over
+
+---
+
+# Fold
+
+```tut:book
 object f1 {
   trait Fold[I, O] {
     type M
@@ -132,25 +251,8 @@ object f1 {
 
 ???
 
----
-
-# Fold
-
-```
-I0 =tally> M0 \
-               combine => M01
-I1 =tally> M1 /              \
-                              combine => M0123 => summarize => O0123
-I2 =tally> M2 \              /
-               combine => M23
-I3 =tally> M3 /
-```
-
----
-
-# Fold
-
 ```tut:book
+import cats._
 import cats.implicits._
 trait Fold[I, O] {
   type M
@@ -169,76 +271,18 @@ object Fold {
 }
 ```
 
-???
-
-Could branch off into beautiful folds...
-
 ---
 
 # Write more code!
 
-- sum: `List[Int] => Option[Int]`
+- sum: `List[Int] => Int`
 - max: `List[Int] => Option[Int]`
 - average: `List[Int] => Option[Int]`
 - word count: `List[String] => Map[String, Int]`
 
+<!-- TODO after this: beautiful folds? -->
+
 ???
-
-object sumfold {
-  val sum = new Fold[Int, Int] {
-    type M = ?
-    def tally(i: Int): M = ???
-    def summarize(sum: M): Int = ???
-    def monoid = new Monoid[M] {
-      def empty = ???
-      def combine(a: M, b: M): M = ???
-    }
-  }
-}
-
-
-object wordcount {
-  val wc = new Fold[String, Map[String, Int]] {
-    type M = ?
-    def tally(s: String): M = ???
-    def summarize(sum: M): Int = ???
-    def monoid = new Monoid[M] {
-      def empty = ???
-      def combine(a: M, b: M): M = ???
-    }
-  }
-}
-
----
-
-# Sum
-
-```tut:book
-object sumfold {
-  val sum = new Fold[Int, Int] {
-    type M = Int
-    def tally(i: M): M = i
-    def summarize(sum: M): M = sum
-    def monoid = implicitly
-  }
-}
-Fold.runList(sumfold.sum, List(1, 2, 3, 4))
-```
-
----
-
-# WordCount
-
-```tut:book
-object wordcount {
-  val sum = new Fold[String, Map[String, Int]] {
-    type M = Map[String, Int]
-    def tally(s: String): M = Map(s -> 1)
-    def summarize(sum: M): M = sum
-    def monoid: Monoid[M] = implicitly
-  }
-}
-```
 
 ---
 
@@ -278,7 +322,13 @@ def foo(arg: Map[String, Int]) = {
 
 ---
 
-# To remember
+# Exercises
+
+- `foldMap`
+
+---
+
+# To Remember
 
 - `foldMap`
 - Monoids exist for lotsa things
@@ -327,15 +377,29 @@ https://github.com/tpolecat/examples/blob/master/src/main/scala/eg/Unfold.scala
 
 ---
 
-# Unfold
-## Implementation
+# Unfold Solutions
+## unfold
 
 ```tut:book
 def unfold[A, B](initial: A)(fun: A => Option[(A, B)]): Stream[B] =
   fun(initial).map { case (a, b) => b #:: unfold(a)(fun) }.getOrElse(Stream.empty)
+```
+
+---
+
+# Unfold Solutions
+## unfold0
+
+```tut:book
 def unfold0[A](a: A)(fun: A => Option[A]): Stream[A] =
   unfold(a)({state => fun(state).map({newState => (newState, newState)})})
+```
+---
 
+# Unfold Solutions
+## unfoldE
+
+```tut:book
 def unfoldE[A, B](initial: A)(fun: A => Stream[Either[A, B]]): Stream[B] =
   fun(initial).flatMap {
     case Left(a) => unfoldE(a)(fun)
@@ -350,8 +414,8 @@ def unfoldE[A, B](initial: A)(fun: A => Stream[Either[A, B]]): Stream[B] =
 
 divisible by 4 / not divisble by 100 / divisible by 400
 
-## Hailstone
-`def hailstone(from: Int): Stream[Int]`
+## Collatz
+`def collatz(from: Int): Stream[Int]`
 
 if even, n/2, if odd, n * 3 + 1, abort on 1
 
@@ -359,6 +423,9 @@ if even, n/2, if odd, n * 3 + 1, abort on 1
 `val fibonacci: Stream[Int]`
 
 n(i+2) = n(i+1) + n(i)
+
+## String Tokenizing
+`def tokenize(string: String): Stream[String]`
 
 ???
 
@@ -377,16 +444,16 @@ leapYears(1990).take(8).toList
 
 ---
 
-# Hailstone
+# Collatz
 
 ```tut:book
-def hailstone(from: Int): Stream[Int] = unfold0(from)({
+def collatz(from: Int): Stream[Int] = unfold0(from)({
   case 1 => None
   case x if x % 2 == 0 => Some(x/2)
   case x => Some(x*3 + 1)
 })
 
-hailstone(12).toList
+collatz(12).toList
 ```
 
 ---
@@ -406,8 +473,8 @@ fibonacci.take(10).toList
 
 # Pagination
 
-- effectful: Now with `Observable` from Monix (or ZIO `Stream`)
-- ZIO `Stream` != stdlib `Stream`
+- effectful: Now with `Observable` from Monix (or FS2 `Stream`)
+- FS2 `Stream` != stdlib `Stream`
 
 ???
 
@@ -421,9 +488,7 @@ Find the unfold on the `Observable` companion object (it's not called unfold)
 
 https://monix.io/api/3.0/monix/reactive/Observable$.html
 
-<!-- And find the unfold on ZIO `Stream`s -->
-
-<!-- https://javadoc.io/doc/dev.zio/zio-streams_2.12/1.0.0-RC11-1 -->
+On FS2 `Stream`, it's called `unfold` - make sure you pick the right one.
 
 ???
 
@@ -437,14 +502,8 @@ Implement it! Result should be `Observable[Post]` <!-- (or `Stream[Post]`) -->
 
 ## Resources
 
-- json-server
-- slate
-
----
-
-# Bonus round
-
-![](https://github.com/slamdata/matryoshka/raw/master/resources/matryoshka.png)
+- `npm install -g json-server && json-server --watch db.json`
+- `PaginationMonix` and `PaginationFS2`
 
 
 </textarea>

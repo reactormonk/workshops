@@ -1,4 +1,4 @@
-scalaVersion := "2.12.6"
+scalaVersion := "2.12.8"
 
 val Http4sVersion = "0.20.9"
 val CirceVersion = "0.11.1"
@@ -16,7 +16,11 @@ libraryDependencies ++= Seq(
   "org.http4s"      %% "http4s-circe"        % Http4sVersion,
   "org.http4s"      %% "http4s-dsl"          % Http4sVersion,
   "io.circe"        %% "circe-generic"       % CirceVersion,
-  "ch.qos.logback"  %  "logback-classic"     % LogbackVersion
+  "ch.qos.logback"  %  "logback-classic"     % LogbackVersion,
+  "org.scalactic" %% "scalactic" % "3.0.8",
+  "org.scalatest" %% "scalatest" % "3.0.8" % Test,
+  "org.typelevel" %% "cats-laws" % "1.1.0" % Test,
+  "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test
 )
 scalacOptions += "-Ypartial-unification"
 
